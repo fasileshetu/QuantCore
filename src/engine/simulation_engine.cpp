@@ -11,11 +11,16 @@ void SimulationEngine::run() {
         process_event(event);
 
         if (on_tick && book_.has_bid() && book_.has_ask()) {
+            double mid = book_.mid_price();
+            mid_history_.push_back(mid);
+
             int signal = on_tick(book_, position_);
             if (signal == 1)
                 execute_buy(book_.best_ask(), 100);
             else if (signal == -1)
                 execute_sell(book_.best_bid(), 100);
+
+            pnl_history_.push_back(position_.realized_pnl);
         }
     }
 }
@@ -35,16 +40,14 @@ void SimulationEngine::process_event(const Event& event) {
 }
 
 void SimulationEngine::execute_buy(double price, int quantity) {
-    double cost = price * quantity;
+    double cost       = price * quantity;
     double prev_total = position_.avg_price * position_.quantity;
-
     position_.quantity  += quantity;
     position_.avg_price  = (prev_total + cost) / position_.quantity;
 }
 
 void SimulationEngine::execute_sell(double price, int quantity) {
     if (position_.quantity < quantity) return;
-
     double pnl = (price - position_.avg_price) * quantity;
     position_.realized_pnl += pnl;
     position_.quantity     -= quantity;
@@ -52,6 +55,14 @@ void SimulationEngine::execute_sell(double price, int quantity) {
 
 double SimulationEngine::get_pnl() const {
     return position_.realized_pnl;
+}
+
+const std::vector<double>& SimulationEngine::get_pnl_history() const {
+    return pnl_history_;
+}
+
+const std::vector<double>& SimulationEngine::get_mid_history() const {
+    return mid_history_;
 }
 
 void SimulationEngine::print_summary() const {

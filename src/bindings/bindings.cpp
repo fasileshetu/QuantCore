@@ -65,5 +65,7 @@ PYBIND11_MODULE(quantcore, m) {
         .def("run",           &SimulationEngine::run)
         .def("get_pnl",       &SimulationEngine::get_pnl)
         .def("print_summary", &SimulationEngine::print_summary)
+        .def("get_pnl_history", &SimulationEngine::get_pnl_history)
+        .def("get_mid_history",  &SimulationEngine::get_mid_history)
         .def_readwrite("on_tick", &SimulationEngine::on_tick);
 }
