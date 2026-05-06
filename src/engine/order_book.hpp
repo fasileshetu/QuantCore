@@ -8,7 +8,7 @@ struct Order {
     int    id;
     Side   side;
     double price;
-    int    quantity;
+    double quantity;   // changed from int to double
 };
 
 class OrderBook {
@@ -26,10 +26,7 @@ public:
     void   print() const;
 
 private:
-    // price -> total quantity at that level
-    std::map<double, int> bids_;   // highest price = best bid
-    std::map<double, int> asks_;   // lowest price  = best ask
-
-    // order_id -> Order (needed for cancellation)
-    std::map<int, Order> orders_;
+    std::map<double, double> bids_;
+    std::map<double, double> asks_;
+    std::map<int, Order>     orders_;
 };

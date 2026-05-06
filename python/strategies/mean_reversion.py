@@ -6,12 +6,12 @@ import quantcore
 from collections import deque
 
 class MeanReversionStrategy:
-    def __init__(self, window=50, entry_z=2.0, exit_z=0.5):
-        self.window  = window     # how many ticks to compute mean/std over
-        self.entry_z = entry_z    # z-score threshold to enter a trade
-        self.exit_z  = exit_z     # z-score threshold to exit a trade
-        self.prices  = deque(maxlen=window)  # rolling window of mid prices
-        self.trade_log = []       # record of every trade
+    def __init__(self, window=100, entry_z=1.5, exit_z=0.3):
+        self.window  = window
+        self.entry_z = entry_z
+        self.exit_z  = exit_z
+        self.prices  = deque(maxlen=window)
+        self.trade_log = []
 
     def on_tick(self, book, position):
         mid = book.mid_price()

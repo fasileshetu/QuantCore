@@ -39,14 +39,14 @@ void SimulationEngine::process_event(const Event& event) {
     }
 }
 
-void SimulationEngine::execute_buy(double price, int quantity) {
+void SimulationEngine::execute_buy(double price, double quantity) {
     double cost       = price * quantity;
     double prev_total = position_.avg_price * position_.quantity;
     position_.quantity  += quantity;
     position_.avg_price  = (prev_total + cost) / position_.quantity;
 }
 
-void SimulationEngine::execute_sell(double price, int quantity) {
+void SimulationEngine::execute_sell(double price, double quantity) {
     if (position_.quantity < quantity) return;
     double pnl = (price - position_.avg_price) * quantity;
     position_.realized_pnl += pnl;

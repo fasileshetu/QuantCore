@@ -10,7 +10,7 @@ maintenance, order matching, and real-time PnL tracking — connected via pybind
             ↓  pybind11
     C++ core (event loop + order book + matching engine)
             ↓
-    Historical market data (NASDAQ ITCH 5.0)
+    Live market data (Coinbase + Alpaca) / Historical data
 
 ## Stack
 
@@ -22,10 +22,37 @@ maintenance, order matching, and real-time PnL tracking — connected via pybind
 
 ## Build
 
-```
-bash
-mkdir build && cd build
-cmake .. -DCMAKE_CXX_COMPILER=/usr/bin/clang++
-make
-./backtester_test
-```
+    mkdir build && cd build
+    cmake .. -DCMAKE_CXX_COMPILER=/usr/bin/clang++
+    make
+
+## Live trading
+
+Connects to Coinbase Advanced Trade websocket for real-time BTC-USD and ETH-USD
+order book data, and Alpaca for US equities. Mean reversion strategy runs live
+on streaming level2 updates.
+
+    cd python/data
+    python3 -u live_runner.py
+
+## Performance
+
+C++ engine processes 5000 market events in **9.5ms** vs **111.8ms** for an equivalent
+pure Python implementation — **11.8x faster**.
+
+## Live results (sample run)
+
+| Asset   | Events    | Trades | PnL (0.001 size) | PnL (scaled 1.0) |
+|---------|-----------|--------|------------------|------------------|
+| BTC-USD | 242,500   | 42     | +$0.9114         | +$911.40         |
+| ETH-USD | 150,000   | 30     | +$0.0273         | +$27.30          |
+
+## Backtest results (synthetic data)
+
+| Metric        | Value   |
+|---------------|---------|
+| Realized PnL  | $65.00  |
+| Sharpe Ratio  | 0.357   |
+| Max Drawdown  | $3.00   |
+| Win Rate      | 100%    |
+| Total Trades  | 4       |

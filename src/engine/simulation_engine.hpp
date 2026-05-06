@@ -5,7 +5,7 @@
 #include <functional>
 
 struct Position {
-    int    quantity    = 0;
+    double    quantity    = 0;
     double avg_price   = 0.0;
     double realized_pnl = 0.0;
 };
@@ -32,6 +32,6 @@ private:
     int                next_order_id_ = 1000;
 
     void process_event(const Event& event);
-    void execute_buy(double price, int quantity);
-    void execute_sell(double price, int quantity);
+    void execute_buy(double price, double quantity);
+    void execute_sell(double price, double quantity);
 };

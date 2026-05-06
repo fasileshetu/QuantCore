@@ -11,6 +11,6 @@ struct Event {
     EventType type;
     int       order_id;
     double    price;
-    int       quantity;
+    double    quantity;   // changed from int to double
     bool      is_buy;
 };
