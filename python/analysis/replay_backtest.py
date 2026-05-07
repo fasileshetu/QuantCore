@@ -14,24 +14,28 @@ from collections import deque
 
 TICK_FILE = '/Users/fasil/QuantCore/data/ticks_20260506_200140.jsonl'
 PRODUCTS  = ['BTC-USD', 'ETH-USD']
-WINDOW    = 100
-ENTRY_Z   = 1.5
-EXIT_Z    = 0.3
+WINDOW    = 500
+ENTRY_Z   = 2.5
+EXIT_Z    = 0.5
 QUANTITY  = 0.001
+
+TAKER_FEE = 0.0060
+MAKER_FEE = 0.0040
+FEE_RATE  = TAKER_FEE
 
 class ProductBacktest:
     def __init__(self, product):
-        self.product    = product
-        self.book       = quantcore.OrderBook()
-        self.prices     = deque(maxlen=WINDOW)
-        self.position   = 0.0
-        self.avg_price  = 0.0
-        self.pnl        = 0.0
+        self.product     = product
+        self.book        = quantcore.OrderBook()
+        self.prices      = deque(maxlen=WINDOW)
+        self.position    = 0.0
+        self.avg_price   = 0.0
+        self.pnl         = 0.0
         self.pnl_history = []
         self.mid_history = []
-        self.trade_log  = []
+        self.trade_log   = []
         self.event_count = 0
-        self.order_map  = {}  # track order_id -> price for cancels
+        self.order_map   = {}
 
     def process(self, d):
         self.event_count += 1
@@ -46,7 +50,7 @@ class ProductBacktest:
                 self.book.add_order(order)
                 self.order_map[d['order_id']] = d['price']
             elif d['type'] == 'CANCEL_ORDER':
-                pass  # skip cancels — order ids don't match across sessions
+                pass
         except Exception:
             pass
 
@@ -68,26 +72,34 @@ class ProductBacktest:
             return
 
         z = (mid - mean) / std
-        z = max(-7.0, min(7.0, z))  # cap z-score
+        z = max(-7.0, min(7.0, z))
 
         if z < -ENTRY_Z and self.position == 0:
             self.position  = QUANTITY
             self.avg_price = self.book.best_ask()
+            buy_fee        = self.avg_price * self.position * FEE_RATE
+            self.pnl      -= buy_fee
             self.trade_log.append({
                 'action': 'BUY',
                 'price':  self.avg_price,
                 'z':      round(z, 3),
-                'tick':   self.event_count
+                'tick':   self.event_count,
+                'fee':    round(buy_fee, 6)
             })
 
         elif self.position > 0 and abs(z) < EXIT_Z:
-            sell_price  = self.book.best_bid()
-            self.pnl   += (sell_price - self.avg_price) * self.position
+            sell_price = self.book.best_bid()
+            gross_pnl  = (sell_price - self.avg_price) * self.position
+            sell_fee   = sell_price * self.position * FEE_RATE
+            self.pnl  += gross_pnl - sell_fee
             self.trade_log.append({
-                'action': 'SELL',
-                'price':  sell_price,
-                'z':      round(z, 3),
-                'tick':   self.event_count
+                'action':    'SELL',
+                'price':     sell_price,
+                'z':         round(z, 3),
+                'tick':      self.event_count,
+                'gross_pnl': round(gross_pnl, 6),
+                'fee':       round(sell_fee, 6),
+                'net_pnl':   round(gross_pnl - sell_fee, 6)
             })
             self.position  = 0
             self.avg_price = 0.0
@@ -119,11 +131,10 @@ print("This may take a moment for 2M events...\n")
 
 with open(TICK_FILE, 'r') as f:
     for i, line in enumerate(f):
-        d = json.loads(line)
+        d       = json.loads(line)
         product = d.get('product')
         if product in backtests:
             backtests[product].process(d)
-
         if i % 200000 == 0 and i > 0:
             print(f"  {i:,} events processed...")
 
@@ -133,29 +144,45 @@ log_path  = f"/Users/fasil/QuantCore/data/replay_{timestamp}.log"
 
 with open(log_path, 'w') as log:
     for product, bt in backtests.items():
-        sh  = sharpe(bt.pnl_history)
-        mdd = max_drawdown(bt.pnl_history)
-        wins = [t for t in bt.trade_log if t['action'] == 'SELL']
-        wr   = 100.0 if not wins else sum(
-            1 for t in wins if t['price'] > bt.avg_price
-        ) / len(wins) * 100
+        sh         = sharpe(bt.pnl_history)
+        mdd        = max_drawdown(bt.pnl_history)
+        sells      = [t for t in bt.trade_log if t['action'] == 'SELL']
+        buys       = [t for t in bt.trade_log if t['action'] == 'BUY']
+        total_fees = sum(t['fee'] for t in bt.trade_log)
+        gross_pnl  = sum(t.get('gross_pnl', 0) for t in sells)
+
+        # break-even fee calculation
+        if buys and sells:
+            avg_trade_value = sum(t['price'] for t in buys) / len(buys)
+            breakeven       = gross_pnl / (2 * len(sells) * avg_trade_value * QUANTITY) if gross_pnl > 0 else 0
+        else:
+            breakeven = 0
 
         print(f"\n=== {product} ===")
-        print(f"  Events:       {bt.event_count:,}")
-        print(f"  Trades:       {len(bt.trade_log)}")
-        print(f"  Realized PnL: ${bt.pnl:.4f}")
-        print(f"  Sharpe:       {sh:.3f}")
-        print(f"  Max Drawdown: ${mdd:.4f}")
+        print(f"  Events:         {bt.event_count:,}")
+        print(f"  Trades:         {len(bt.trade_log)}")
+        print(f"  Gross PnL:      ${gross_pnl:.4f}")
+        print(f"  Total fees:     ${total_fees:.4f}  ({FEE_RATE*100:.2f}% per side)")
+        print(f"  Net PnL:        ${bt.pnl:.4f}")
+        print(f"  Sharpe:         {sh:.3f}")
+        print(f"  Max Drawdown:   ${mdd:.4f}")
+        print(f"  Break-even fee: {breakeven*100:.4f}% per side")
 
         log.write(f"=== {product} ===\n")
-        log.write(f"  Events:       {bt.event_count:,}\n")
-        log.write(f"  Trades:       {len(bt.trade_log)}\n")
-        log.write(f"  Realized PnL: ${bt.pnl:.4f}\n")
-        log.write(f"  Sharpe:       {sh:.3f}\n")
-        log.write(f"  Max Drawdown: ${mdd:.4f}\n\n")
+        log.write(f"  Events:         {bt.event_count:,}\n")
+        log.write(f"  Trades:         {len(bt.trade_log)}\n")
+        log.write(f"  Gross PnL:      ${gross_pnl:.4f}\n")
+        log.write(f"  Total fees:     ${total_fees:.4f}  ({FEE_RATE*100:.2f}% per side)\n")
+        log.write(f"  Net PnL:        ${bt.pnl:.4f}\n")
+        log.write(f"  Sharpe:         {sh:.3f}\n")
+        log.write(f"  Max Drawdown:   ${mdd:.4f}\n")
+        log.write(f"  Break-even fee: {breakeven*100:.4f}% per side\n\n")
         log.write("  Trade log:\n")
         for t in bt.trade_log:
-            log.write(f"    {t['action']:5s}  price={t['price']:.2f}  z={t['z']:.3f}  tick={t['tick']:,}\n")
+            if t['action'] == 'BUY':
+                log.write(f"    BUY    price={t['price']:.2f}  z={t['z']:.3f}  fee=${t['fee']:.6f}  tick={t['tick']:,}\n")
+            else:
+                log.write(f"    SELL   price={t['price']:.2f}  z={t['z']:.3f}  gross=${t.get('gross_pnl', 0):.6f}  fee=${t['fee']:.6f}  net=${t.get('net_pnl', 0):.6f}  tick={t['tick']:,}\n")
 
 print(f"\nLog saved to {log_path}")
 
@@ -168,7 +195,6 @@ colors = {'BTC-USD': '#f39c12', 'ETH-USD': '#3498db'}
 for i, (product, bt) in enumerate(backtests.items()):
     color = colors[product]
 
-    # PnL curve
     axes[0][i].plot(bt.pnl_history, color='#2ecc71', linewidth=1.0)
     axes[0][i].axhline(0, color='gray', linewidth=0.5, linestyle='--')
     axes[0][i].set_title(f'{product} — Realized PnL')
@@ -176,7 +202,6 @@ for i, (product, bt) in enumerate(backtests.items()):
     axes[0][i].set_xlabel('Tick')
     axes[0][i].grid(True, alpha=0.3)
 
-    # mid price
     axes[1][i].plot(bt.mid_history, color=color, linewidth=0.5)
     axes[1][i].set_title(f'{product} — Mid Price')
     axes[1][i].set_ylabel('Price ($)')
