@@ -16,7 +16,7 @@ def make_event(d):
     return e
 
 # generate a longer tick stream for a more realistic backtest
-raw_events = generate_tick_stream(n_events=2000, seed=42)
+raw_events = generate_tick_stream(n_events=50000, seed=42)
 events = [make_event(d) for d in raw_events]
 
 print(f"Running backtest over {len(events)} events...")

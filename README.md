@@ -56,3 +56,10 @@ pure Python implementation — **11.8x faster**.
 | Max Drawdown  | $3.00   |
 | Win Rate      | 100%    |
 | Total Trades  | 4       |
+
+## Real market data replay (Coinbase — 2M events)
+
+| Asset   | Events      | Trades | PnL (0.001 size) | PnL (scaled 1.0) | Max Drawdown |
+|---------|-------------|--------|------------------|------------------|--------------|
+| BTC-USD | 1,162,732   | 252    | +$26.26          | +$26,260         | $0.00        |
+| ETH-USD | 868,251     | 92     | +$0.23           | +$225.90         | $0.00        |

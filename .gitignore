@@ -21,4 +21,10 @@ __pycache__/
 .vscode/
 
 # Logs
+data/*.logdata/*.png
+data/*.jsonl
+
+# Tick data
+data/*.jsonl
 data/*.log
+data/*.png
